@@ -313,7 +313,7 @@ class SSLMetaArch(nn.Module):
                         "dino_loss.center",
                         "ibot_patch_loss.center",
                     ],
-                    prefixes_not_sharded=["backbone.rope_embed.periods"],
+                    prefixes_not_sharded=["backbone.rope_embed.periods", "backbone.blocks."],
                     process_group=distributed.get_default_process_group(),
                 )
                 self.gram_teacher_initialized = True

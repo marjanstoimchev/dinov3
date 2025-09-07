@@ -274,26 +274,21 @@ def init_fsdp_model_from_checkpoint(
 ):
     if not Path(checkpoint_path).is_dir():  # PyTorch standard checkpoint
         logger.info(f"Loading pretrained weights from {checkpoint_path}")
-        chkpt = torch.load(checkpoint_path, map_location="cpu")["teacher"]
-        from torch.distributed.device_mesh import DeviceMesh, init_device_mesh
-
-        if process_group is None:
-            world_mesh = init_device_mesh(
-                "cuda",
-                mesh_shape=(dist.get_world_size(),),
-                mesh_dim_names=("dp",),
-            )
+        full_chkpt = torch.load(checkpoint_path, map_location="cpu")
+        # Handle both training checkpoints (with "teacher" key) and pretrained weights (direct)
+        if "teacher" in full_chkpt:
+            chkpt = full_chkpt["teacher"]
         else:
-            world_mesh = DeviceMesh.from_group(process_group, "cuda")
-        chkpt = {
-            k: (
-                torch.distributed.tensor.distribute_tensor(v, world_mesh, src_data_rank=None)
-                if not k.startswith(pns)
-                else v
-            )
-            for pns in prefixes_not_sharded
-            for k, v in chkpt.items()
-        }
+            chkpt = full_chkpt
+            # For pretrained weights, add "backbone." prefix to match expected model structure
+            chkpt = {f"backbone.{k}": v for k, v in chkpt.items()}
+        # For FSDP2, avoid manual tensor distribution to prevent DTensor/Tensor mixing
+        # Let FSDP handle the tensor distribution automatically during load_state_dict
+        # This avoids the complex logic of determining which tensors to distribute
+        # Handle skip_load_prefixes parameter
+        if skip_load_prefixes is None:
+            skip_load_prefixes = []
+            
         model.load_state_dict(
             {k: v for k, v in chkpt.items() if not any(k.startswith(prefix) for prefix in skip_load_prefixes)}
         )
