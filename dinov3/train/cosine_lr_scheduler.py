@@ -42,7 +42,13 @@ class CosineScheduler(object):
 
         self.schedule = np.concatenate((freeze_schedule, warmup_schedule, schedule), dtype=np.float64)
 
-        assert len(self.schedule) == self.total_iters
+        # Ensure schedule length matches total_iters (pad or truncate if needed)
+        if len(self.schedule) != self.total_iters:
+            if len(self.schedule) < self.total_iters:
+                padding = np.full(self.total_iters - len(self.schedule), self.final_value)
+                self.schedule = np.concatenate((self.schedule, padding))
+            else:
+                self.schedule = self.schedule[:self.total_iters]
 
     def __getitem__(self, it):
         if it >= self.total_iters:
