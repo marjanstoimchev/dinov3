@@ -50,7 +50,8 @@ class SSLMetaArch(nn.Module):
         gram_model_dict = dict()
 
         student_backbone, teacher_backbone, embed_dim = build_model_from_cfg(cfg)
-        torch.cuda.empty_cache()
+        # Note: Don't call torch.cuda.empty_cache() here - it triggers CUDA init
+        # which breaks torchrun's distributed setup when using torch.compile
         gc.collect()
         gram_backbone, _ = build_model_from_cfg(cfg, only_teacher=True)
         logger.info(f"Number of parameters: {count_parameters(student_backbone)}")
